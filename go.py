@@ -8,6 +8,7 @@ from sklearn import svm
 from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import chi2
 from sklearn.model_selection import train_test_split
+from sklearn.cluster import AffinityPropagation
 
 import sys
 import numpy
@@ -292,13 +293,32 @@ def test_accuracy(data, target):
     #clf = svm.SVC()
     fit_res = clf.fit(data_train, target_train)
     return fit_res.score(data_test, target_test)
-    
+
+def group_by_cluster(time_label, ip_label, cluster_label):
+    n_cluster = max(cluster_label) + 1
+    groups = [[] for i in range(n_cluster)]
+    for i,cl in enumerate(cluster_label):
+        groups[cl].append((ip_label[i], time_label[i]))
+
+    n_times = max(time_label) + 1
+
+    allip = []
+    for g in groups:
+        tls = [i[1] for i in g]
+        if len(set(tls)) >= n_times:
+            ips = [i[0] for i in g]
+            allip += ips
+    resip = set(allip)
+    for ip in resip:
+        print ip
+    print "number of res ip", len(resip)
 
 def main():
     logfilenames = sys.argv[1:]
 
-    t0 = time.clock()
     X = []
+    time_label = []
+    ip_label = []
     for i,filename in enumerate(logfilenames):
         # read training file
         res = read_frigate_log([filename])
@@ -307,11 +327,19 @@ def main():
             res[key].cal_features()
             f = res[key].get_features()
             X.append(f)
+            time_label.append(i)
+            ip_label.append(key)
 
-    # cluster.do_clustering(f)
-
+    t0 = time.clock()
+    ap = AffinityPropagation()   
+    ap.fit(X)   
+    print "number of IP:", len(ap.labels_)
+    print "number of cluster:", len(set(ap.labels_))
+    #print ap.labels_
     t1 = time.clock()
-    print "time of reading trainset: ", t1 - t0
+    print "time of clustering: ", t1 - t0
+
+    group_by_cluster(time_label, ip_label, ap.labels_)
 
 
 
