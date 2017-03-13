@@ -18,7 +18,7 @@ import scipy.signal
 import time 
 import cPickle
 
-import cluster
+import safeip
 
 def basic_float_numerical_info(array):
     minval = min(array)
@@ -309,20 +309,28 @@ def group_by_cluster(time_label, ip_label, cluster_label):
             ips = [i[0] for i in g]
             allip += ips
     resip = set(allip)
+    f = open("resultip", "w")
     for ip in resip:
-        print ip
+        f.write("%s\n" % ip)
     print "number of res ip", len(resip)
 
 def main():
+    if len(sys.argv) == 1:
+        sys.exit()
     logfilenames = sys.argv[1:]
+    safeip.init_safeip()
 
     X = []
     time_label = []
     ip_label = []
+    safeip_cnt = 0
     for i,filename in enumerate(logfilenames):
         # read training file
         res = read_frigate_log([filename])
         for key in res:
+            if safeip.is_safeip(key):
+                safeip_cnt += 1
+                continue
             #res[key].print_original_logs()
             res[key].cal_features()
             f = res[key].get_features()
@@ -330,14 +338,17 @@ def main():
             time_label.append(i)
             ip_label.append(key)
 
+    print "number of IP:", len(X) + safeip_cnt
+    print "number of safe IP:", safeip_cnt
+    #print ap.labels_
     t0 = time.clock()
+    print "start clustering ..."
     ap = AffinityPropagation()   
     ap.fit(X)   
-    print "number of IP:", len(ap.labels_)
-    print "number of cluster:", len(set(ap.labels_))
-    #print ap.labels_
     t1 = time.clock()
+    print "number of IP:", len(ap.labels_) + safeip_cnt
     print "time of clustering: ", t1 - t0
+    print "number of cluster:", len(set(ap.labels_))
 
     group_by_cluster(time_label, ip_label, ap.labels_)
 
